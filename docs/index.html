@@ -2,364 +2,643 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>vitd — Vitamin D Tracker</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
-  --bg:#1a1b26;--surface:#24283b;--border:#3b4261;
-  --fg:#c0caf5;--dim:#565f89;--bright:#a9b1d6;
-  --green:#9ece6a;--yellow:#e0af68;--red:#f7768e;--blue:#7aa2f7;--cyan:#7dcfff;--magenta:#bb9af7;
+  --bg:#0d0d0f;--surface:#1a1a1e;--elevated:#252529;--border:#2a2a30;
+  --fg:#f0f0f5;--muted:#8b8b9a;--accent:#4ade80;--accent-dim:#22c55e;
+  --sun:#fbbf24;--supp:#60a5fa;--alert:#f87171;--warn:#fbbf24;
 }
-body{background:var(--bg);color:var(--fg);font-family:'JetBrains Mono','Fira Code','Cascadia Code','SF Mono',Consolas,monospace;font-size:14px;height:100vh;display:flex;flex-direction:column}
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-header .logo{font-size:18px;font-weight:700;color:var(--cyan)}
-header .logo span{color:var(--yellow)}
-header .subtitle{color:var(--dim);font-size:12px}
-header .sync-status{margin-left:auto;font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px}
-header .sync-status .dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
-header .sync-status .dot.ok{background:var(--green)}
-header .sync-status .dot.err{background:var(--red)}
-header .sync-status .dot.syncing{background:var(--yellow);animation:pulse 1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--fg)}
 
-#terminal{flex:1;overflow-y:auto;padding:16px 20px;line-height:1.7;white-space:pre-wrap;word-wrap:break-word}
-#terminal .line{min-height:1.7em}
-#terminal .prompt{color:var(--cyan);user-select:none}
-.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}.blue{color:var(--blue)}.cyan{color:var(--cyan)}.dim{color:var(--dim)}.bold{font-weight:700}.magenta{color:var(--magenta)}
+.app{height:100%;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
 
-#controls{background:var(--surface);border-top:1px solid var(--border);padding:12px 20px;flex-shrink:0}
-.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
-.btn-row:last-child{margin-bottom:0}
-.btn{background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:6px 14px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;transition:all .15s}
-.btn:hover{border-color:var(--cyan);color:var(--bright)}
-.btn:active{transform:scale(.96)}
-.btn.primary{border-color:var(--cyan);color:var(--cyan)}
-.btn.warn{border-color:var(--yellow);color:var(--yellow)}
-.btn.danger{border-color:var(--red);color:var(--red)}
-.input-inline{background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:5px 10px;border-radius:4px;font-family:inherit;font-size:13px;width:80px;text-align:center}
-.input-inline:focus{outline:none;border-color:var(--cyan)}
-.input-inline::placeholder{color:var(--dim)}
-.label{color:var(--dim);font-size:12px}
-.sep{color:var(--border);margin:0 4px;user-select:none}
+/* Header */
+.header{flex-shrink:0;padding:20px 24px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.logo{font-size:24px;font-weight:700;letter-spacing:-0.5px}
+.logo span{color:var(--accent)}.logo span:nth-child(2){color:var(--sun)}
+.sync-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--elevated);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .2s}
+.sync-btn:hover{border-color:var(--accent);transform:scale(1.05)}
+.sync-btn.syncing{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.subtitle{color:var(--muted);font-size:14px}
 
-#settings-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
-#settings-modal.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;width:400px;max-width:90vw}
-.modal h2{color:var(--cyan);margin-bottom:16px;font-size:16px}
-.modal label{display:block;color:var(--dim);font-size:12px;margin-bottom:4px;margin-top:12px}
-.modal input[type=text],.modal input[type=password]{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:8px 12px;border-radius:4px;font-family:inherit;font-size:13px}
-.modal input:focus{outline:none;border-color:var(--cyan)}
-.modal .actions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+/* Card Container */
+.cards-container{flex:1;position:relative;overflow:hidden}
+.cards{height:100%;display:flex;transition:transform .3s cubic-bezier(0.4,0,0.2,1);touch-action:pan-y}
+.card{min-width:100%;height:100%;padding:20px 24px;overflow-y:auto;scroll-behavior:smooth}
+.card::-webkit-scrollbar{width:0}
 
-@media(max-width:600px){
-  #terminal{padding:12px;font-size:13px}
-  .btn{padding:5px 10px;font-size:12px}
-  .input-inline{width:60px}
-}
+/* Card Title */
+.card-title{font-size:28px;font-weight:700;margin-bottom:24px;letter-spacing:-0.5px}
+
+/* Progress Ring */
+.progress-ring-container{display:flex;align-items:center;gap:20px;margin-bottom:28px;padding:20px;background:var(--surface);border-radius:20px;border:1px solid var(--border)}
+.progress-ring{position:relative;width:120px;height:120px;flex-shrink:0}
+.progress-ring svg{transform:rotate(-90deg)}
+.progress-ring-bg{fill:none;stroke:var(--elevated);stroke-width:8}
+.progress-ring-fill{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .5s ease}
+.progress-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.progress-ring-value{font-size:32px;font-weight:700}
+.progress-ring-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.progress-ring-desc{flex:1}
+.progress-ring-desc .level{font-size:48px;font-weight:800;line-height:1;letter-spacing:-2px}
+.progress-ring-desc .level-text{font-size:16px;color:var(--muted);margin-top:4px}
+.progress-ring-desc .eta{font-size:14px;color:var(--muted);margin-top:8px}
+
+/* Quick Actions Grid */
+.quick-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+.action-btn{position:relative;padding:20px 16px;background:var(--surface);border:1px solid var(--border);border-radius:16px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.action-btn:active{transform:scale(0.98)}
+.action-btn:hover{border-color:var(--accent-dim)}
+.action-icon{font-size:28px}
+.action-label{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.action-value{font-size:18px;font-weight:700}
+.action-btn.sun:hover{border-color:var(--sun)}.action-btn.sun .action-value{color:var(--sun)}
+.action-btn.supp:hover{border-color:var(--supp)}.action-btn.supp .action-value{color:var(--supp)}
+.action-btn.note:hover{border-color:var(--accent)}
+.action-btn.test:hover{border-color:var(--warn)}
+
+/* Input Sheet */
+.input-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);border-radius:20px 20px 0 0;padding:24px;transform:translateY(100%);transition:transform .3s cubic-bezier(0.4,0,0.2,1);z-index:100;max-width:480px;margin:0 auto}
+.input-sheet.open{transform:translateY(0)}
+.input-sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .3s;z-index:99}
+.input-sheet-backdrop.open{opacity:1;pointer-events:auto}
+.input-sheet-title{font-size:20px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.input-sheet-input{width:100%;padding:16px 20px;font-size:24px;font-weight:700;background:var(--elevated);border:2px solid var(--border);border-radius:12px;color:var(--fg);text-align:center;margin-bottom:20px;-moz-appearance:textfield}
+.input-sheet-input::-webkit-outer-spin-button,.input-sheet-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.input-sheet-input:focus{outline:none;border-color:var(--accent)}
+.input-sheet-actions{display:flex;gap:12px}
+.input-sheet-btn{flex:1;padding:16px;border-radius:12px;border:none;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s}
+.input-sheet-btn.cancel{background:var(--elevated);color:var(--fg)}
+.input-sheet-btn.save{background:var(--accent);color:var(--bg)}
+.input-sheet-btn:active{transform:scale(0.98)}
+
+/* History List */
+.history-list{display:flex;flex-direction:column;gap:12px}
+.history-item{display:flex;align-items:center;gap:16px;padding:16px;background:var(--surface);border-radius:16px;border:1px solid var(--border)}
+.history-date{flex-shrink:0;width:60px;text-align:center}
+.history-day{font-size:12px;color:var(--muted);text-transform:uppercase}
+.history-date-num{font-size:24px;font-weight:700}
+.history-content{flex:1;display:flex;flex-direction:column;gap:4px}
+.history-row{display:flex;gap:16px;font-size:14px}
+.history-label{color:var(--muted);width:60px}
+.history-value{font-weight:600}
+.history-value.good{color:var(--accent)}.history-value.bad{color:var(--alert)}.history-value.warn{color:var(--warn)}
+.history-dot{width:8px;height:8px;border-radius:50%;background:var(--elevated);flex-shrink:0}
+.history-dot.good{background:var(--accent)}.history-dot.bad{background:var(--alert)}
+
+/* Tips */
+.tips-list{display:flex;flex-direction:column;gap:16px}
+.tip-card{padding:20px;background:var(--surface);border-radius:16px;border:1px solid var(--border)}
+.tip-card.critical{border-color:var(--alert);background:rgba(248,113,113,.1)}
+.tip-title{font-size:16px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.tip-content{font-size:15px;line-height:1.6;color:var(--muted)}
+.tip-content strong{color:var(--fg);font-weight:600}
+
+/* Settings */
+.settings-list{display:flex;flex-direction:column;gap:16px}
+.settings-item{padding:20px;background:var(--surface);border-radius:16px;border:1px solid var(--border)}
+.settings-label{font-size:14px;font-weight:600;margin-bottom:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.settings-input{width:100%;padding:14px 16px;font-size:15px;background:var(--elevated);border:1px solid var(--border);border-radius:10px;color:var(--fg);font-family:inherit}
+.settings-input:focus{outline:none;border-color:var(--accent)}
+.settings-desc{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
+.settings-btn{width:100%;padding:16px;border-radius:12px;border:none;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;background:var(--elevated);color:var(--fg);margin-top:12px}
+.settings-btn.primary{background:var(--accent);color:var(--bg)}
+.settings-btn.danger{background:var(--alert);color:var(--bg)}
+.settings-btn:active{transform:scale(0.98)}
+
+/* Bottom Nav */
+.bottom-nav{flex-shrink:0;display:flex;justify-content:space-around;padding:12px 16px 24px;background:var(--surface);border-top:1px solid var(--border)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;cursor:pointer;transition:all .2s;border-radius:12px}
+.nav-item:hover{background:var(--elevated)}
+.nav-item.active{color:var(--accent)}
+.nav-item.active .nav-icon{color:var(--accent)}
+.nav-icon{font-size:24px;color:var(--muted);transition:color .2s}
+.nav-label{font-size:11px;font-weight:600;color:var(--muted);transition:color .2s}
+.nav-item.active .nav-label{color:var(--accent)}
+
+/* Toast */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--elevated);color:var(--fg);padding:14px 24px;border-radius:12px;font-size:14px;font-weight:600;opacity:0;transition:all .3s;z-index:200;pointer-events:none;box-shadow:0 10px 40px rgba(0,0,0,.4);border:1px solid var(--border)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Empty State */
+.empty-state{text-align:center;padding:40px 20px}
+.empty-icon{font-size:64px;margin-bottom:16px}
+.empty-title{font-size:20px;font-weight:700;margin-bottom:8px}
+.empty-text{font-size:15px;color:var(--muted);line-height:1.6}
+
+/* Level Badge */
+.level-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.level-badge.severe{background:rgba(248,113,113,.2);color:var(--alert)}
+.level-badge.deficient{background:rgba(251,191,36,.2);color:var(--warn)}
+.level-badge.insufficient{background:rgba(251,191,36,.15);color:#fcd34d}
+.level-badge.normal{background:rgba(74,222,128,.2);color:var(--accent)}
+
+/* Tab indicator */
+.tab-indicator{display:flex;justify-content:center;gap:6px;margin-bottom:20px}
+.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--elevated);transition:all .2s}
+.tab-dot.active{width:24px;border-radius:3px;background:var(--accent)}
 </style>
 </head>
 <body>
+<div class="app">
 
-<header>
-  <div class="logo">☀ <span>vitd</span></div>
-  <div class="subtitle">Vitamin D Tracker</div>
-  <div class="sync-status">
-    <div class="dot" id="syncDot"></div>
-    <span id="syncLabel">offline</span>
+<header class="header">
+  <div class="header-top">
+    <div class="logo">☀ <span>vit</span><span>d</span></div>
+    <button class="sync-btn" id="syncBtn" onclick="openSettings()" title="Sync Settings">⚙</button>
   </div>
+  <div class="subtitle" id="headerSubtitle">Track your Vitamin D</div>
 </header>
 
-<div id="terminal"></div>
+<div class="cards-container" id="cardsContainer">
+  <div class="cards" id="cards">
 
-<div id="controls">
-  <div class="btn-row">
-    <button class="btn primary" onclick="cmdStatus()">status</button>
-    <button class="btn" onclick="cmdRemind()">remind</button>
-    <button class="btn" onclick="cmdTips()">tips</button>
-    <button class="btn" onclick="cmdHistory()">history</button>
-    <button class="btn" onclick="openSettings()" style="margin-left:auto">⚙ sync</button>
-  </div>
-  <div class="btn-row">
-    <span class="label">☀ sun</span>
-    <input type="number" class="input-inline" id="sunMin" placeholder="min" min="1">
-    <button class="btn" onclick="cmdSun()">log</button>
-    <span class="sep">|</span>
-    <span class="label">💊 supp</span>
-    <input type="number" class="input-inline" id="suppIU" placeholder="IU" min="1">
-    <button class="btn" onclick="cmdSupp()">log</button>
-    <span class="sep">|</span>
-    <span class="label">🧪 test</span>
-    <input type="number" class="input-inline" id="testLevel" placeholder="ng/mL" min="0" step="0.1">
-    <button class="btn" onclick="cmdTest()">log</button>
-    <span class="sep">|</span>
-    <span class="label">📝 note</span>
-    <input type="text" class="input-inline" id="noteText" placeholder="text" style="width:120px">
-    <button class="btn" onclick="cmdNote()">log</button>
-  </div>
-</div>
+    <!-- Today Card -->
+    <div class="card" id="card-today">
+      <div class="tab-indicator">
+        <div class="tab-dot active"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+      </div>
 
-<div id="settings-modal">
-  <div class="modal">
-    <h2>⚙ GitHub Gist Sync</h2>
-    <p class="dim" style="font-size:12px">Sync your vitd data across devices via a GitHub Gist. Your token is stored in browser localStorage only.</p>
-    <label>GitHub Personal Access Token</label>
-    <input type="password" id="ghToken" placeholder="ghp_...">
-    <label>Gist ID <span class="dim">(leave empty to auto-create)</span></label>
-    <input type="text" id="ghGistId" placeholder="gist id">
-    <div class="actions">
-      <button class="btn" onclick="closeSettings()">Cancel</button>
-      <button class="btn" onclick="disconnectSync()" style="color:var(--red)">Disconnect</button>
-      <button class="btn primary" onclick="saveSettings()">Save &amp; Sync</button>
+      <div class="progress-ring-container" id="levelContainer" style="display:none">
+        <div class="progress-ring">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle class="progress-ring-bg" cx="60" cy="60" r="54"/>
+            <circle class="progress-ring-fill" id="levelRing" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"/>
+          </svg>
+          <div class="progress-ring-text">
+            <div class="progress-ring-value" id="levelValue">--</div>
+            <div class="progress-ring-label">ng/mL</div>
+          </div>
+        </div>
+        <div class="progress-ring-desc">
+          <div class="level" id="levelNum">--</div>
+          <div class="level-text" id="levelText">No test logged</div>
+          <div class="eta" id="levelEta"></div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <button class="action-btn sun" onclick="openInput('sun')">
+          <span class="action-icon">☀</span>
+          <span class="action-label">Sun Today</span>
+          <span class="action-value" id="sunValue">0 min</span>
+        </button>
+        <button class="action-btn supp" onclick="openInput('supp')">
+          <span class="action-icon">💊</span>
+          <span class="action-label">Supplement</span>
+          <span class="action-value" id="suppValue">0 IU</span>
+        </button>
+        <button class="action-btn test" onclick="openInput('test')">
+          <span class="action-icon">🧪</span>
+          <span class="action-label">Test Result</span>
+          <span class="action-value" id="testValue">Log level</span>
+        </button>
+        <button class="action-btn note" onclick="openInput('note')">
+          <span class="action-icon">📝</span>
+          <span class="action-label">Note</span>
+          <span class="action-value" id="noteValue">Add note</span>
+        </button>
+      </div>
+
+      <div class="empty-state" id="welcomeState">
+        <div class="empty-icon">🩺</div>
+        <div class="empty-title">Welcome to vitd</div>
+        <div class="empty-text">Log your Vitamin D test result to get started.<br>Tap 🧪 Test Result above.</div>
+      </div>
     </div>
+
+    <!-- History Card -->
+    <div class="card" id="card-history">
+      <div class="tab-indicator">
+        <div class="tab-dot"></div>
+        <div class="tab-dot active"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+      </div>
+      <div class="card-title">History</div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+
+    <!-- Tips Card -->
+    <div class="card" id="card-tips">
+      <div class="tab-indicator">
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot active"></div>
+        <div class="tab-dot"></div>
+      </div>
+      <div class="card-title">Tips</div>
+      <div class="tips-list" id="tipsList">
+        <div class="tip-card">
+          <div class="tip-title">🌅 Getting Started</div>
+          <div class="tip-content">Log your Vitamin D test result to see personalized tips based on your level.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Card (in cards flow) -->
+    <div class="card" id="card-settings">
+      <div class="tab-indicator">
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot"></div>
+        <div class="tab-dot active"></div>
+      </div>
+      <div class="card-title">Settings</div>
+      <div class="settings-list">
+        <div class="settings-item">
+          <div class="settings-label">GitHub Token</div>
+          <input type="password" class="settings-input" id="ghToken" placeholder="ghp_...">
+          <div class="settings-desc">Create a token with 'gist' scope at github.com/settings/tokens</div>
+        </div>
+        <div class="settings-item">
+          <div class="settings-label">Gist ID (optional)</div>
+          <input type="text" class="settings-input" id="ghGistId" placeholder="Auto-created if empty">
+          <div class="settings-desc">Leave empty to create a new gist automatically</div>
+        </div>
+        <button class="settings-btn primary" onclick="saveSyncSettings()">Save & Sync</button>
+        <button class="settings-btn" onclick="syncNow()" id="syncNowBtn">Sync Now</button>
+        <button class="settings-btn danger" onclick="resetData()">Clear All Data</button>
+      </div>
+    </div>
+
   </div>
 </div>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <div class="nav-item active" onclick="goToCard(0)">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Today</span>
+  </div>
+  <div class="nav-item" onclick="goToCard(1)">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">History</span>
+  </div>
+  <div class="nav-item" onclick="goToCard(2)">
+    <span class="nav-icon">💡</span>
+    <span class="nav-label">Tips</span>
+  </div>
+  <div class="nav-item" onclick="goToCard(3)">
+    <span class="nav-icon">⚙</span>
+    <span class="nav-label">Settings</span>
+  </div>
+</nav>
+
+<!-- Input Sheet -->
+<div class="input-sheet-backdrop" id="inputBackdrop" onclick="closeInput()"></div>
+<div class="input-sheet" id="inputSheet">
+  <div class="input-sheet-title" id="inputTitle">☀ Log Sun</div>
+  <input type="number" class="input-sheet-input" id="inputField" placeholder="0">
+  <div class="input-sheet-actions">
+    <button class="input-sheet-btn cancel" onclick="closeInput()">Cancel</button>
+    <button class="input-sheet-btn save" onclick="saveInput()" id="saveBtn">Save</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
 <script>
+// Data model
 const SEVERE=10,DEFICIENT=20,INSUFFICIENT=30,SUFFICIENT=50,OPTIMAL=60,TOXIC=100;
-const LEVEL_LABELS=[[0,SEVERE,"SEVERE DEFICIENCY"],[SEVERE,DEFICIENT,"DEFICIENT"],[DEFICIENT,INSUFFICIENT,"INSUFFICIENT"],[INSUFFICIENT,SUFFICIENT,"LOW NORMAL"],[SUFFICIENT,OPTIMAL,"NORMAL"],[OPTIMAL,TOXIC,"OPTIMAL"],[TOXIC,500,"TOXIC - SEEK MEDICAL HELP"]];
 
-function levelLabel(v){for(const[lo,hi,l]of LEVEL_LABELS)if(v>=lo&&v<hi)return l;return"UNKNOWN"}
-function levelColor(v){if(v<SEVERE)return"red";if(v<DEFICIENT)return"red";if(v<INSUFFICIENT)return"yellow";if(v<SUFFICIENT)return"yellow";if(v<TOXIC)return"green";return"red"}
+function levelLabel(v){if(v<SEVERE)return"Severe";if(v<DEFICIENT)return"Deficient";if(v<INSUFFICIENT)return"Insufficient";if(v<SUFFICIENT)return"Low Normal";if(v<OPTIMAL)return"Normal";if(v<TOXIC)return"Optimal";return"Toxic"}
+function levelClass(v){if(v<DEFICIENT)return"severe";if(v<INSUFFICIENT)return"deficient";if(v<SUFFICIENT)return"insufficient";return"normal"}
 function isDeficient(l){return l!=null&&l<30}
 function sunTarget(l){return isDeficient(l)?20:15}
 function suppTarget(l){return isDeficient(l)?2000:1000}
-function bar(cur,tgt,w=30){const r=Math.min(cur/tgt,1)||0,f=Math.round(r*w);return`[${"█".repeat(f)}${"░".repeat(w-f)}] ${cur}/${tgt}`}
-function todayKey(){return new Date().toISOString().slice(0,10)}
-function nowHHMM(){return new Date().toTimeString().slice(0,5)}
 
-function loadData(){
-  const d=localStorage.getItem("vitd_data");
-  if(!d)return{tests:[],daily:{}};
-  try{return JSON.parse(d)}catch{return{tests:[],daily:{}}}
-}
+function loadData(){try{const d=localStorage.getItem("vitd_data");if(!d)return{tests:[],daily:{}};return JSON.parse(d)}catch{return{tests:[],daily:{}}}}
 function saveData(data){localStorage.setItem("vitd_data",JSON.stringify(data))}
+function todayKey(){return new Date().toISOString().slice(0,10)}
 function getToday(data){const k=todayKey();if(!data.daily[k])data.daily[k]={sun_minutes:0,supplements:[],notes:[]};return data.daily[k]}
 function latestLevel(data){return data.tests.length?data.tests[data.tests.length-1].level:null}
+function nowHHMM(){return new Date().toTimeString().slice(0,5)}
 
-const term=document.getElementById("terminal");
+// UI State
+let currentCard=0;
+let inputMode='';
 
-function c(text,cls){return cls?`<span class="${cls}">${text}</span>`:text}
-function print(html){const div=document.createElement("div");div.className="line";div.innerHTML=html;term.appendChild(div);term.scrollTop=term.scrollHeight}
-function prompt(cmd){print(`${c("❯","cyan")} ${c(cmd,"bright")}`)}
-function separator(){print(`${"─".repeat(40)}`)}
-
-function cmdStatus(){
-  prompt("vitd status");
-  const data=loadData(),today=getToday(data),level=latestLevel(data),color=level?levelColor(level):"";
-  print("");
-  print(`  ${c("☀  Vitamin D Dashboard","bold")}`);
-  print(`  ${"─".repeat(38)}`);
-  if(level){
-    print(`  Latest Level:  ${c(`${level} ng/mL`,color+" bold")}  (${c(levelLabel(level),color)})`);
-    print(`  To Sufficiency:${c(bar(level,30),"green")}`);
-    if(level<INSUFFICIENT){const deficit=30-level,weeks=Math.max(1,Math.round(deficit/5));print(`  Est. Recovery: ${c(`~${weeks} weeks`,"cyan")} with proper supplementation`)}
-  }else{print(`  ${c("No test results logged yet. Use the 🧪 test button above.","dim")}`)}
-  print("");
-  const st=sunTarget(level);
-  print(`  Sun Today:     ${c(bar(today.sun_minutes,st),"yellow")} min`);
-  const suppTotal=today.supplements.reduce((a,s)=>a+s.iu,0),dt=suppTarget(level);
-  print(`  Supplement:    ${c(bar(suppTotal,dt),"blue")} IU`);
-  if(today.notes.length){print("");print(`  ${c("Notes:","dim")}`);for(const n of today.notes)print(`    ${c("•","dim")} ${c(n,"dim")}`)}
-  print("");
+// Navigation
+function goToCard(n){
+  currentCard=n;
+  document.getElementById('cards').style.transform=`translateX(-${n*100}%)`;
+  document.querySelectorAll('.nav-item').forEach((el,i)=>el.classList.toggle('active',i===n));
+  document.querySelectorAll('.tab-dot').forEach((el,i)=>el.classList.toggle('active',i===n));
+  if(n===1)renderHistory();
+  if(n===2)renderTips();
 }
 
-function cmdSun(){
-  const el=document.getElementById("sunMin"),min=parseInt(el.value);
-  if(!min||min<1){print(`${c("⚠ Enter minutes of sun exposure","red")}`);return}
-  prompt(`vitd sun ${min}`);
-  const data=loadData(),today=getToday(data);
-  today.sun_minutes+=min;saveData(data);syncUp();
-  const level=latestLevel(data),st=sunTarget(level),rem=Math.max(0,st-today.sun_minutes);
-  if(rem>0)print(`  ☀  Logged ${c(`${min} min`,"yellow")} sun. ${c(`${rem} min more`,"cyan")} to hit today's target.`);
-  else print(`  ☀  Logged ${c(`${min} min`,"yellow")} sun. ${c("Target reached!","green")}`);
-  el.value="";
-}
-
-function cmdSupp(){
-  const el=document.getElementById("suppIU"),iu=parseInt(el.value);
-  if(!iu||iu<1){print(`${c("⚠ Enter IU of Vitamin D3","red")}`);return}
-  prompt(`vitd supp ${iu}`);
-  const data=loadData(),today=getToday(data);
-  today.supplements.push({iu,time:nowHHMM()});saveData(data);syncUp();
-  print(`  💊 Logged ${c(`${iu} IU`,"blue")} supplement.`);
-  el.value="";
-}
-
-function cmdTest(){
-  const el=document.getElementById("testLevel"),level=parseFloat(el.value);
-  if(isNaN(level)||level<0){print(`${c("⚠ Enter your Vitamin D level in ng/mL","red")}`);return}
-  prompt(`vitd test ${level}`);
-  const data=loadData();
-  data.tests.push({date:todayKey(),level});saveData(data);syncUp();
-  const color=levelColor(level),label=levelLabel(level);
-  print(``);
-  print(`  🧪 Test result: ${c(`${level} ng/mL`,color+" bold")} (${c(label,color)})`);
-  if(level<SEVERE)print(`  ${c("⚠  Critical! See a doctor immediately for prescription loading doses.","red")}`);
-  else if(level<DEFICIENT)print(`  ${c("⚠  Severe deficiency. Prescription supplements likely needed.","red")}`);
-  else if(level<INSUFFICIENT)print(`  ${c("⚠  Deficient. High-dose OTC or prescription recommended.","yellow")}`);
-  else if(level<SUFFICIENT)print(`  ${c("⚠  Insufficient. Daily supplementation recommended.","yellow")}`);
-  else print(`  ${c("✓  Good levels. Maintain with daily supplements and sun.","green")}`);
-  print("");el.value="";
-}
-
-function cmdNote(){
-  const el=document.getElementById("noteText"),text=el.value.trim();
-  if(!text){print(`${c("⚠ Enter a note","red")}`);return}
-  prompt(`vitd note "${text}"`);
-  const data=loadData(),today=getToday(data);
-  today.notes.push(text);saveData(data);syncUp();
-  print(`  📝 Note saved.`);el.value="";
-}
-
-function cmdRemind(){
-  prompt("vitd remind");
-  const data=loadData(),today=getToday(data),hour=new Date().getHours(),level=latestLevel(data),st=sunTarget(level);
-  print("");print(`  ${c("🔔 Reminders","bold")}`);
-  print(`  ${"─".repeat(30)}`);
-  const reminders=[];
-  if(hour>=10&&hour<=14&&today.sun_minutes<st){const rem=st-today.sun_minutes;reminders.push(`☀  Step outside NOW! UV is at peak. Need ${rem} more min of sun.`)}
-  if(hour>=14&&today.sun_minutes<st){const rem=st-today.sun_minutes;reminders.push(`☀  You missed peak sun hours. Try to get ${rem} min tomorrow 10am-2pm.`)}
-  if(hour<10)reminders.push(`☀  Peak sun window is 10am-2pm. Set an alert for later!`);
-  const suppTotal=today.supplements.reduce((a,s)=>a+s.iu,0),dt=suppTarget(level);
-  if(suppTotal<dt){const rem=dt-suppTotal;reminders.push(`💊 Take your Vitamin D supplement (${rem} IU remaining today).`)}
-  if(isDeficient(level)){reminders.push("🩺 Book a follow-up blood test in 6-8 weeks.");reminders.push("🥛 Include calcium-rich foods with your supplement.")}
-  if(!reminders.length)print(`  ${c("All caught up! Nothing pending right now.","green")}`);
-  else for(const r of reminders)print(`  ${r}`);
-  print("");
-}
-
-function cmdHistory(){
-  prompt("vitd history");
-  const data=loadData(),days=7;
-  print("");print(`  ${c("📋 Last 7 Days","bold")}`);
-  print(`  ${"─".repeat(50)}`);
-  print(`  ${"Date".padEnd(12)} ☀ Sun   💊 Supp   Notes`);
-  print(`  ${"─".repeat(50)}`);
-  for(let i=0;i<days;i++){
-    const d=new Date(Date.now()-i*864e5).toISOString().slice(0,10);
-    if(data.daily[d]){
-      const e=data.daily[d],supp=e.supplements.reduce((a,s)=>a+s.iu,0),notes=e.notes.slice(0,2).join(", "),mk=e.sun_minutes>=15?c("✓","green"):c("✗","red");
-      print(`  ${d.padEnd(12)} ${mk} ${String(e.sun_minutes).padStart(4)}m  ${String(supp).padStart(6)} IU  ${notes}`);
-    }else{print(`  ${d.padEnd(12)} ${c("✗   —       — IU","dim")}`)}
+// Swipe support
+let startX=0;
+const container=document.getElementById('cardsContainer');
+container.addEventListener('touchstart',e=>{startX=e.touches[0].clientX},{passive:true});
+container.addEventListener('touchend',e=>{
+  const endX=e.changedTouches[0].clientX;
+  const diff=startX-endX;
+  if(Math.abs(diff)>50){
+    if(diff>0&&currentCard<3)goToCard(currentCard+1);
+    if(diff<0&&currentCard>0)goToCard(currentCard-1);
   }
-  print("");
-  if(data.tests.length){print(`  ${c("Test History:","bold")}`);for(const t of data.tests)print(`  ${t.date}  ${c(`${t.level} ng/mL`,levelColor(t.level))} (${levelLabel(t.level)})`);print("")}
+},{passive:true});
+
+// Input Sheet
+function openInput(mode){
+  inputMode=mode;
+  const sheet=document.getElementById('inputSheet');
+  const backdrop=document.getElementById('inputBackdrop');
+  const title=document.getElementById('inputTitle');
+  const field=document.getElementById('inputField');
+  const saveBtn=document.getElementById('saveBtn');
+
+  const titles={sun:'☀ Log Sun',supp:'💊 Log Supplement',test:'🧪 Log Test Result',note:'📝 Add Note'};
+  const placeholders={sun:'Minutes',supp:'IU (e.g. 2000)',test:'ng/mL (e.g. 25.5)',note:'How are you feeling?'};
+  const saveLabels={sun:'Add Sun',supp:'Add Dose',test:'Save Result',note:'Save Note'};
+
+  title.textContent=titles[mode];
+  field.placeholder=placeholders[mode];
+  field.type=mode==='note'?'text':'number';
+  field.value='';
+  saveBtn.textContent=saveLabels[mode];
+
+  sheet.classList.add('open');
+  backdrop.classList.add('open');
+  setTimeout(()=>field.focus(),100);
 }
 
-function cmdTips(){
-  prompt("vitd tips");
-  const data=loadData(),level=latestLevel(data);
-  print("");print(`  ${c("💡 Personalized Tips","bold")}`);print(`  ${"─".repeat(40)}`);
-  if(level!=null&&level<INSUFFICIENT){
-    print(`
-  Your level (${level} ng/mL) is ${c("critically low","red")}. Action plan:
+function closeInput(){
+  document.getElementById('inputSheet').classList.remove('open');
+  document.getElementById('inputBackdrop').classList.remove('open');
+}
 
-  ${c("Supplements:","bold")}
-    • Take 2000-4000 IU D3 daily (or as prescribed)
-    • Take with the ${c("largest meal","bold")} of the day (fat improves absorption)
-    • Pair with K2 (100mcg) to direct calcium to bones
-    • Don't take on empty stomach — waste of money
+function saveInput(){
+  const val=document.getElementById('inputField').value;
+  if(!val){closeInput();return}
 
-  ${c("Sun:","bold")}
-    • 20-30 min midday sun (10am-2pm) on bare arms/face
-    • Darker skin = more time needed
-    • Glass blocks UV-B — step ${c("outside","bold")}, not just near a window
-    • Clouds reduce UV by only ~20-30%
+  const data=loadData();
 
-  ${c("Diet:","bold")}
-    • Fatty fish (salmon, sardines, mackerel) — 2-3x/week
-    • Egg yolks, fortified milk, fortified cereals
-    • UV-exposed mushrooms (leave them in sun 15 min before cooking)
+  if(inputMode==='sun'){
+    const min=parseInt(val);
+    if(min>0){getToday(data).sun_minutes+=min;saveData(data);showToast(`Added ${min} min sun ☀`);syncUp()}
+  }else if(inputMode==='supp'){
+    const iu=parseInt(val);
+    if(iu>0){getToday(data).supplements.push({iu,time:nowHHMM()});saveData(data);showToast(`Logged ${iu} IU 💊`);syncUp()}
+  }else if(inputMode==='test'){
+    const level=parseFloat(val);
+    if(!isNaN(level)){data.tests.push({date:todayKey(),level});saveData(data);showToast(`Test: ${level} ng/mL 🧪`);syncUp()}
+  }else if(inputMode==='note'){
+    if(val.trim()){getToday(data).notes.push(val.trim());saveData(data);showToast('Note saved 📝');syncUp()}
+  }
 
-  ${c("Lifestyle:","bold")}
-    • Set a daily alarm: "vitamin D" at noon
-    • Walk during lunch break — counts as sun + exercise
-    • Re-test in 6-8 weeks
+  closeInput();
+  renderToday();
+}
 
-  ${c("Medical:","bold")}
-    • If level < 10, ask about prescription loading doses
-    • Get calcium and B12 checked too
-    • Magnesium helps D activation — consider supplementing`);
-  }else if(level!=null&&level<SUFFICIENT){
-    print(`
-  Your level (${level} ng/mL) is ${c("below optimal","yellow")}.
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
 
-  • Take 1000-2000 IU D3 daily with a meal
-  • 15 min midday sun on exposed skin, 3-4x/week
-  • Re-test in 3 months`);
-  }else if(level!=null){
-    print(`
-  Your level (${level} ng/mL) is ${c("good","green")}!
+// Render functions
+function renderToday(){
+  const data=loadData();
+  const today=getToday(data);
+  const level=latestLevel(data);
 
-  • Maintain with 1000 IU D3 daily
-  • Keep getting regular sun exposure
-  • Test annually`);
+  // Sun & Supp values
+  document.getElementById('sunValue').textContent=`${today.sun_minutes} min`;
+  const suppTotal=today.supplements.reduce((a,s)=>a+s.iu,0);
+  document.getElementById('suppValue').textContent=`${suppTotal} IU`;
+
+  // Welcome state
+  if(!level){
+    document.getElementById('welcomeState').style.display='block';
+    document.getElementById('levelContainer').style.display='none';
+    document.getElementById('testValue').textContent='Log level';
+    document.getElementById('headerSubtitle').textContent='Track your Vitamin D';
+    return;
+  }
+
+  document.getElementById('welcomeState').style.display='none';
+  document.getElementById('levelContainer').style.display='flex';
+  document.getElementById('testValue').textContent=`${level} ng/mL`;
+
+  // Level ring
+  const circumference=339.292;
+  const offset=circumference-(Math.min(level/30,1)*circumference);
+  document.getElementById('levelRing').style.strokeDashoffset=offset;
+  document.getElementById('levelValue').textContent=level;
+  document.getElementById('levelNum').textContent=level;
+  document.getElementById('levelText').textContent=levelLabel(level);
+  document.getElementById('levelText').className='level-text level-badge '+levelClass(level);
+
+  if(level<INSUFFICIENT){
+    const weeks=Math.max(1,Math.round((30-level)/5));
+    document.getElementById('levelEta').textContent=`~${weeks} weeks to sufficiency`;
   }else{
-    print(`
-  ${c("Log your test result first using the 🧪 test button above.","dim")}
-
-  General tips:
-  • 15-20 min midday sun, 3-4x/week
-  • 1000-2000 IU D3 daily with a fatty meal
-  • Re-test every 3-6 months`);
+    document.getElementById('levelEta').textContent='Maintain with daily habits';
   }
-  print("");
+
+  document.getElementById('headerSubtitle').textContent=`${level} ng/mL — ${levelLabel(level)}`;
 }
 
-function cmdSetup(level){
+function renderHistory(){
   const data=loadData();
-  if(!data.tests.length){data.tests.push({date:todayKey(),level});saveData(data);syncUp()}
-  print(`  ${c("✓ Setup complete!","green")}`);
-  print(`  Vitamin D level set to: ${c(`${level} ng/mL`,levelColor(level)+" bold")} (${levelLabel(level)})`);
-  print("");
+  const list=document.getElementById('historyList');
+  list.innerHTML='';
+
+  // Show last 14 days
+  for(let i=0;i<14;i++){
+    const d=new Date(Date.now()-i*864e5);
+    const dateStr=d.toISOString().slice(0,10);
+    const dayName=d.toLocaleDateString('en-US',{weekday:'short'});
+    const dayNum=d.getDate();
+
+    const entry=data.daily[dateStr]||{sun_minutes:0,supplements:[],notes:[]};
+    const suppTotal=entry.supplements.reduce((a,s)=>a+s.iu,0);
+    const sunGood=entry.sun_minutes>=15;
+    const suppGood=suppTotal>=1000;
+
+    const item=document.createElement('div');
+    item.className='history-item';
+    item.innerHTML=`
+      <div class="history-date">
+        <div class="history-day">${dayName}</div>
+        <div class="history-date-num">${dayNum}</div>
+      </div>
+      <div class="history-content">
+        <div class="history-row">
+          <span class="history-label">☀ Sun</span>
+          <span class="history-value ${sunGood?'good':'bad'}">${entry.sun_minutes} min</span>
+        </div>
+        <div class="history-row">
+          <span class="history-label">💊 Supp</span>
+          <span class="history-value ${suppGood?'good':'bad'}">${suppTotal} IU</span>
+        </div>
+        ${entry.notes.length?`<div class="history-row" style="margin-top:4px;color:var(--muted)">${entry.notes[0]}</div>`:''}
+      </div>
+      <div class="history-dot ${sunGood&&suppGood?'good':'bad'}"></div>
+    `;
+    list.appendChild(item);
+  }
+
+  // Add test history
+  if(data.tests.length){
+    const testTitle=document.createElement('div');
+    testTitle.style.cssText='font-size:14px;font-weight:700;color:var(--muted);margin-top:20px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px';
+    testTitle.textContent='Test History';
+    list.appendChild(testTitle);
+
+    [...data.tests].reverse().forEach(t=>{
+      const item=document.createElement('div');
+      item.className='history-item';
+      const cls=levelClass(t.level);
+      item.innerHTML=`
+        <div class="history-date" style="width:80px">
+          <div class="history-day">Test</div>
+          <div class="history-date-num" style="font-size:16px">${t.date.slice(5)}</div>
+        </div>
+        <div class="history-content">
+          <div class="history-row">
+            <span class="history-value ${cls==='normal'?'good':cls==='severe'?'bad':'warn'}">${t.level} ng/mL</span>
+          </div>
+          <div class="history-row" style="margin-top:4px">
+            <span class="level-badge ${cls}">${levelLabel(t.level)}</span>
+          </div>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  }
 }
 
-function openSettings(){document.getElementById("settings-modal").classList.add("open");const s=loadSync();document.getElementById("ghToken").value=s.token||"";document.getElementById("ghGistId").value=s.gistId||""}
-function closeSettings(){document.getElementById("settings-modal").classList.remove("open")}
+function renderTips(){
+  const data=loadData();
+  const level=latestLevel(data);
+  const list=document.getElementById('tipsList');
 
-function loadSync(){try{return JSON.parse(localStorage.getItem("vitd_sync")||"{}")}catch{return{}}}
-function saveSync(s){localStorage.setItem("vitd_sync",JSON.stringify(s))}
+  if(!level){
+    list.innerHTML=`<div class="tip-card"><div class="tip-title">🌅 Getting Started</div><div class="tip-content">Log your Vitamin D test result to see personalized tips based on your level.</div></div>`;
+    return;
+  }
 
-function disconnectSync(){localStorage.removeItem("vitd_sync");updateSyncDot("offline");closeSettings();print(`  ${c("⛔ Sync disconnected.","yellow")}`)}
+  if(level<INSUFFICIENT){
+    list.innerHTML=`
+      <div class="tip-card critical">
+        <div class="tip-title">🚨 Critical Deficiency</div>
+        <div class="tip-content">Your level (${level} ng/mL) is critically low. Take <strong>2000-4000 IU D3 daily</strong> with your largest meal. Consider seeing a doctor for prescription loading doses if under 10.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-title">☀ Sun Exposure</div>
+        <div class="tip-content">Aim for <strong>20-30 min midday sun</strong> (10am-2pm) on bare arms/face. Glass blocks UV-B — you must step outside. Darker skin needs more time.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-title">💊 Supplements</div>
+        <div class="tip-content">Take D3 with <strong>fat</strong> for absorption. Pair with K2 (100mcg) and ensure adequate magnesium. Don't take on empty stomach.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-title">🥗 Diet</div>
+        <div class="tip-content">Eat fatty fish (salmon, sardines) 2-3x/week. Egg yolks, fortified milk, and UV-exposed mushrooms help.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-title">🩺 Medical</div>
+        <div class="tip-content">Re-test in <strong>6-8 weeks</strong>. Get calcium and B12 checked too. Magnesium is required for D activation.</div>
+      </div>
+    `;
+  }else if(level<SUFFICIENT){
+    list.innerHTML=`
+      <div class="tip-card">
+        <div class="tip-title">📈 Below Optimal</div>
+        <div class="tip-content">Your level (${level} ng/mL) needs improvement. Take <strong>1000-2000 IU D3</strong> daily with a meal. Get 15 min midday sun 3-4x/week.</div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-title">☀ Best Practices</div>
+        <div class="tip-content">Consistent daily dosing beats sporadic high doses. Take with your largest meal for 2x better absorption.</div>
+      </div>
+    `;
+  }else{
+    list.innerHTML=`
+      <div class="tip-card">
+        <div class="tip-title">✅ Good Level</div>
+        <div class="tip-content">Your level (${level} ng/mL) is healthy! Maintain with <strong>1000 IU D3</strong> daily and regular sun exposure. Test annually.</div>
+      </div>
+    `;
+  }
+}
 
-async function saveSettings(){
-  const token=document.getElementById("ghToken").value.trim(),gistId=document.getElementById("ghGistId").value.trim();
-  if(!token){print(`${c("⚠ Token is required","red")}`);return}
-  saveSync({token,gistId});closeSettings();
+// Gist Sync
+function loadSync(){try{return JSON.parse(localStorage.getItem('vitd_sync')||'{}')}catch{return{}}}
+function saveSync(s){localStorage.setItem('vitd_sync',JSON.stringify(s))}
+
+function openSettings(){
+  goToCard(3);
+  const s=loadSync();
+  document.getElementById('ghToken').value=s.token||'';
+  document.getElementById('ghGistId').value=s.gistId||'';
+}
+
+async function saveSyncSettings(){
+  const token=document.getElementById('ghToken').value.trim();
+  const gistId=document.getElementById('ghGistId').value.trim();
+  if(!token){showToast('Token required');return}
+  saveSync({token,gistId});
+  showToast('Settings saved');
   await syncUp();
 }
 
 async function syncUp(){
-  const s=loadSync();if(!s.token)return;
-  updateSyncDot("syncing");
+  const s=loadSync();
+  if(!s.token)return;
+  const btn=document.getElementById('syncBtn');
+  btn.classList.add('syncing');
+
   const data=loadData();
   try{
     let gistId=s.gistId;
     if(!gistId){
-      const res=await fetch("https://api.github.com/gists",{method:"POST",headers:{Authorization:`token ${s.token}`,"Content-Type":"application/json"},body:JSON.stringify({description:"vitd data sync",public:false,files:{"data.json":{content:JSON.stringify(data,null,2)}}})});
-      if(!res.ok)throw new Error(`create failed: ${res.status}`);
+      const res=await fetch('https://api.github.com/gists',{method:'POST',headers:{Authorization:`token ${s.token}`,'Content-Type':'application/json'},body:JSON.stringify({description:'vitd data sync',public:false,files:{'data.json':{content:JSON.stringify(data,null,2)}}})});
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
       const g=await res.json();gistId=g.id;s.gistId=gistId;saveSync(s);
     }else{
-      const res=await fetch(`https://api.github.com/gists/${gistId}`,{method:"PATCH",headers:{Authorization:`token ${s.token}`,"Content-Type":"application/json"},body:JSON.stringify({files:{"data.json":{content:JSON.stringify(data,null,2)}}})});
-      if(!res.ok)throw new Error(`update failed: ${res.status}`);
+      const res=await fetch(`https://api.github.com/gists/${gistId}`,{method:'PATCH',headers:{Authorization:`token ${s.token}`,'Content-Type':'application/json'},body:JSON.stringify({files:{'data.json':{content:JSON.stringify(data,null,2)}}})});
+      if(!res.ok)throw new Error(`HTTP ${res.status}`);
     }
-    updateSyncDot("ok");document.getElementById("syncLabel").textContent=`synced ${new Date().toLocaleTimeString()}`;
-  }catch(e){updateSyncDot("err");document.getElementById("syncLabel").textContent="sync error";print(`  ${c(`⚠ Sync failed: ${e.message}`,"red")}`)}
+    showToast('Synced to cloud ☁');
+  }catch(e){showToast('Sync failed: '+e.message)}
+  btn.classList.remove('syncing');
 }
 
 async function syncDown(){
-  const s=loadSync();if(!s.token||!s.gistId)return;
-  updateSyncDot("syncing");
+  const s=loadSync();
+  if(!s.token||!s.gistId)return;
+  const btn=document.getElementById('syncBtn');
+  btn.classList.add('syncing');
+
   try{
     const res=await fetch(`https://api.github.com/gists/${s.gistId}`,{headers:{Authorization:`token ${s.token}`}});
     if(!res.ok)throw new Error(`${res.status}`);
-    const g=await res.json(),remote=JSON.parse(g.files["data.json"].content);
-    const local=loadData();
-    const merged=mergeData(local,remote);
-    saveData(merged);updateSyncDot("ok");document.getElementById("syncLabel").textContent=`synced ${new Date().toLocaleTimeString()}`;
-  }catch(e){updateSyncDot("err");document.getElementById("syncLabel").textContent="sync error"}
+    const g=await res.json();
+    const remote=JSON.parse(g.files['data.json'].content);
+    const merged=mergeData(loadData(),remote);
+    saveData(merged);
+    showToast('Synced from cloud ☁');
+  }catch(e){console.error(e)}
+  btn.classList.remove('syncing');
+  renderToday();
 }
+
+function syncNow(){syncUp()}
 
 function mergeData(local,remote){
   const allTests=[...local.tests,...remote.tests];
@@ -368,26 +647,31 @@ function mergeData(local,remote){
   tests.sort((a,b)=>a.date.localeCompare(b.date));
   const daily={...remote.daily};
   for(const[date,entry]of Object.entries(local.daily)){
-    if(!daily[date]){daily[date]=entry}
+    if(!daily[date])daily[date]=entry;
     else{daily[date].sun_minutes=Math.max(daily[date].sun_minutes,entry.sun_minutes);
-      const suppIU=new Set(entry.supplements.map(s=>`${s.iu}:${s.time}`));
-      for(const s of entry.supplements){if(!daily[date].supplements.some(e=>`${e.iu}:${e.time}`===`${s.iu}:${s.time}`))daily[date].supplements.push(s)}
-      for(const n of entry.notes){if(!daily[date].notes.includes(n))daily[date].notes.push(n)}
+      for(const s of entry.supplements)if(!daily[date].supplements.some(e=>e.iu===s.iu&&e.time===s.time))daily[date].supplements.push(s);
+      for(const n of entry.notes)if(!daily[date].notes.includes(n))daily[date].notes.push(n);
     }
   }
-  return{tests,daily}
+  return{tests,daily};
 }
 
-function updateSyncDot(state){const dot=document.getElementById("syncDot");dot.className="dot";if(state==="ok")dot.classList.add("ok");else if(state==="err")dot.classList.add("err");else if(state==="syncing")dot.classList.add("syncing")}
+function resetData(){
+  if(!confirm('Clear all data? This cannot be undone.'))return;
+  localStorage.removeItem('vitd_data');
+  showToast('All data cleared');
+  renderToday();
+}
 
-const data=loadData();
-if(!data.tests.length){
-  const level=parseFloat(new URLSearchParams(location.search).get("level"));
-  if(level&&!isNaN(level)){cmdSetup(level)}
-  else{print(`\n  ${c("☀  Welcome to vitd","bold cyan")}\n  ${c("─".repeat(38))}\n\n  Enter your latest Vitamin D test result using the\n  ${c("🧪 test","cyan")} button above to get started.\n\n  Example: type ${c("10.8","yellow")} in the test field and click ${c("log","cyan")}.\n`)}
-else{cmdStatus()}
-
+// Init
+renderToday();
 syncDown();
+
+// Keyboard shortcuts
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('inputSheet').classList.contains('open'))saveInput();
+  if(e.key==='Escape')closeInput();
+});
 </script>
 </body>
 </html>
