@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1a1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="vitd">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>vitd — Vitamin D Tracker</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -266,6 +272,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
         </div>
         <button class="settings-btn primary" onclick="saveSyncSettings()">Save & Sync</button>
         <button class="settings-btn" onclick="syncNow()" id="syncNowBtn">Sync Now</button>
+        <button class="settings-btn" onclick="installApp()" id="installBtn" style="display:none">📱 Install App</button>
+        <button class="settings-btn" onclick="toggleNotifications()" id="notifBtn">🔔 Enable Reminders</button>
         <button class="settings-btn danger" onclick="resetData()">Clear All Data</button>
       </div>
     </div>
@@ -672,6 +680,144 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&document.getElementById('inputSheet').classList.contains('open'))saveInput();
   if(e.key==='Escape')closeInput();
 });
+
+// PWA: Service Worker Registration
+if('serviceWorker'in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/vitd/sw.js')
+      .then(reg=>{
+        console.log('SW registered');
+        reg.addEventListener('updatefound',()=>{
+          const newWorker=reg.installing;
+          newWorker.addEventListener('statechange',()=>{
+            if(newWorker.state==='installed'&&navigator.serviceWorker.controller){
+              showToast('Update available! Refresh to update.');
+            }
+          });
+        });
+      })
+      .catch(err=>console.log('SW registration failed:',err));
+  });
+}
+
+// PWA: Background Sync Support
+async function syncWhenOnline(){
+  if('serviceWorker'in navigator&&'SyncManager'in window){
+    const reg=await navigator.serviceWorker.ready;
+    await reg.sync.register('vitd-sync');
+  }
+}
+
+// PWA: Notification Permission & Reminders
+let reminderInterval=null;
+
+async function requestNotificationPermission(){
+  if(!('Notification'in window))return false;
+  const result=await Notification.requestPermission();
+  return result==='granted';
+}
+
+function scheduleReminders(){
+  if(reminderInterval)clearInterval(reminderInterval);
+  
+  // Check every minute for reminders
+  reminderInterval=setInterval(()=>{
+    if(Notification.permission!=='granted')return;
+    
+    const now=new Date();
+    const hour=now.getHours();
+    const minute=now.getMinutes();
+    const data=loadData();
+    const today=getToday(data);
+    const level=latestLevel(data);
+    
+    // Peak sun reminder: 11am-1pm if no sun logged
+    if(hour===12&&minute===0&&today.sun_minutes===0){
+      new Notification('☀️ Time for Vitamin D',{body:'UV is at peak! Step outside for 15-20 minutes.',icon:'/vitd/icons/icon-192.png',badge:'/vitd/icons/icon-192.png'});
+    }
+    
+    // Supplement reminder: 8pm if insufficient
+    if(hour===20&&minute===0){
+      const suppTotal=today.supplements.reduce((a,s)=>a+s.iu,0);
+      const target=suppTarget(level);
+      if(suppTotal<target){
+        const remaining=target-suppTotal;
+        new Notification('💊 Vitamin D Reminder',{body:`Take ${remaining} IU supplement today.`,icon:'/vitd/icons/icon-192.png',badge:'/vitd/icons/icon-192.png'});
+      }
+    }
+  },60000);
+}
+
+// Auto-request notification permission on first setup
+if('Notification'in window&&Notification.permission==='default'){
+  setTimeout(()=>{
+    if(latestLevel(loadData()))requestNotificationPermission().then(granted=>{
+      if(granted)scheduleReminders();
+    });
+  },5000);
+}
+
+// Listen for messages from SW
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data&&e.data.type==='SYNC_REQUIRED')syncUp();
+  });
+}
+
+// Make install prompt available for Settings card
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  const btn=document.getElementById('installBtn');
+  if(btn)btn.style.display='block';
+});
+
+// Install app button handler
+async function installApp(){
+  if(!deferredPrompt){showToast('App already installed or not available');return}
+  deferredPrompt.prompt();
+  const{outcome}=await deferredPrompt.userChoice;
+  if(outcome==='accepted'){
+    showToast('Installing...');
+    deferredPrompt=null;
+    document.getElementById('installBtn').style.display='none';
+  }else{
+    showToast('Install cancelled');
+  }
+}
+
+// Notification toggle handler
+async function toggleNotifications(){
+  const btn=document.getElementById('notifBtn');
+  if(!('Notification'in window)){showToast('Notifications not supported');return}
+  
+  if(Notification.permission==='granted'){
+    // Toggle off
+    if(reminderInterval){clearInterval(reminderInterval);reminderInterval=null}
+    showToast('Reminders disabled');
+    btn.textContent='🔔 Enable Reminders';
+  }else{
+    // Request permission
+    const granted=await requestNotificationPermission();
+    if(granted){
+      scheduleReminders();
+      showToast('Reminders enabled!');
+      btn.textContent='🔔 Reminders On';
+      // Send test notification
+      setTimeout(()=>new Notification('vitd',{body:'Reminders are now active!',icon:'/vitd/icons/icon-192.png'}),1000);
+    }else{
+      showToast('Permission denied');
+    }
+  }
+}
+
+// Update notification button state on load
+if('Notification'in window&&Notification.permission==='granted'){
+  const btn=document.getElementById('notifBtn');
+  if(btn)btn.textContent='🔔 Reminders On';
+  scheduleReminders();
+}
 </script>
 </body>
 </html>
