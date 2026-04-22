@@ -298,6 +298,7 @@ button:focus-visible{border-radius:12px}
         </div>
         <button class="settings-btn primary" onclick="saveSyncSettings()">Save & Sync</button>
         <button class="settings-btn" onclick="syncNow()" id="syncNowBtn">Sync Now</button>
+        <button class="settings-btn" onclick="checkForUpdates()" id="updateBtn">🔄 Check for Updates</button>
         <button class="settings-btn" onclick="installApp()" id="installBtn" style="display:none">📱 Install App</button>
         <button class="settings-btn" onclick="toggleNotifications()" id="notifBtn">🔔 Enable Reminders</button>
         <button class="settings-btn" onclick="window.open('https://nd28.github.io/hydrate/','_blank')">🌊 Open Hydration Tracker</button>
@@ -825,15 +826,20 @@ document.addEventListener('keydown',e=>{
 });
 
 // PWA: Service Worker Registration
+let swReg=null;
+let swUpdatePending=false;
+
 if('serviceWorker'in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/vitd/sw.js')
       .then(reg=>{
+        swReg=reg;
         console.log('SW registered');
         reg.addEventListener('updatefound',()=>{
           const newWorker=reg.installing;
           newWorker.addEventListener('statechange',()=>{
             if(newWorker.state==='installed'&&navigator.serviceWorker.controller){
+              swUpdatePending=true;
               showToast('Update available! Refresh to update.');
             }
           });
@@ -841,6 +847,28 @@ if('serviceWorker'in navigator){
       })
       .catch(err=>console.log('SW registration failed:',err));
   });
+}
+
+async function checkForUpdates(){
+  if(!('serviceWorker'in navigator)){showToast('Updates not supported');return}
+  const btn=document.getElementById('updateBtn');
+  const originalText=btn.textContent;
+  btn.textContent='🔄 Checking…';
+  try{
+    const reg=swReg||await navigator.serviceWorker.getRegistration();
+    if(!reg){showToast('No service worker found');btn.textContent=originalText;return}
+    await reg.update();
+    if(swUpdatePending){
+      showToast('Update ready. Refreshing…');
+      setTimeout(()=>window.location.reload(),1200);
+    }else{
+      showToast('App is up to date');
+    }
+  }catch(e){
+    showToast('Check failed');
+    console.error(e);
+  }
+  btn.textContent=originalText;
 }
 
 // PWA: Background Sync Support
